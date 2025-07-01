@@ -13,13 +13,13 @@ variable "openstack_insecure" {
 variable "openstack_image_id" {
   type        = string
   description = "인스턴스 생성 시 사용할 OpenStack 이미지 ID (Rocky9)"
-  default     = "c7bbf35b-753f-4e3b-940a-f6b4367f4511"
+  default     = "856968ac-0d9d-4ddb-9a78-937fffdf34aa"
 }
 
 variable "openstack_flavor_name" {
   type        = string
   description = "인스턴스 생성 시 사용할 OpenStack Flavor 이름"
-  default     = "r1.kubernetes"
+  default     = "t1.kubernetes"
 }
 
 variable "k8s_external_net_name" {
@@ -129,6 +129,65 @@ variable "k8s_internal_port_5_ip" {
   type        = string
   description = "k8s_internal_port_5 IP"
   default     = "192.168.10.40"
+}
+
+########################
+# PXE 네트워크 관련 변수들
+########################
+
+variable "pxe_subnet_name" {
+  type        = string
+  description = "PXE 서브넷 이름"
+  default     = "pxe-subnet"
+}
+
+variable "pxe_cidr" {
+  type        = string
+  description = "PXE 서브넷 CIDR"
+  default     = "172.168.0.0/16"
+}
+
+variable "pxe_gateway_ip" {
+  type        = string
+  description = "PXE 서브넷 게이트웨이 IP (null이면 게이트웨이 없음)"
+  default     = ""
+}
+
+variable "pxe_enable_dhcp" {
+  type        = bool
+  description = "PXE 서브넷에서 DHCP를 활성화할지 여부"
+  default     = false
+}
+
+# PXE 네트워크 포트 IP 주소들
+variable "pxe_port_ansible_server_ip" {
+  type        = string
+  description = "Ansible Server PXE 포트 IP"
+  default     = "172.168.1.100"
+}
+
+variable "pxe_port_controller_ip" {
+  type        = string
+  description = "Controller Node PXE 포트 IP"
+  default     = "172.168.1.10"
+}
+
+variable "pxe_port_compute1_ip" {
+  type        = string
+  description = "Compute Node 1 PXE 포트 IP"
+  default     = "172.168.1.20"
+}
+
+variable "pxe_port_compute2_ip" {
+  type        = string
+  description = "Compute Node 2 PXE 포트 IP"
+  default     = "172.168.1.30"
+}
+
+variable "pxe_port_storage_ip" {
+  type        = string
+  description = "Storage Node PXE 포트 IP"
+  default     = "172.168.1.40"
 }
 
 variable "ansible_server_name" {

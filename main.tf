@@ -125,6 +125,24 @@ resource "openstack_networking_subnet_v2" "k8s_internal_subnet" {
 }
 
 ########################
+# 4. net-pxe 네트워크/서브넷
+########################
+
+data "openstack_networking_network_v2" "net-pxe" {
+  name = "net-pxe" # 기존에 존재하는 PXE 네트워크
+}
+
+resource "openstack_networking_subnet_v2" "pxe_subnet" {
+  name       = var.pxe_subnet_name
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  cidr       = var.pxe_cidr
+  ip_version = 4
+  # var.pxe_gateway_ip가 빈 문자열("")이면 gateway_ip를 null로 처리
+  gateway_ip  = length(var.pxe_gateway_ip) > 0 ? var.pxe_gateway_ip : null
+  enable_dhcp = var.pxe_enable_dhcp
+}
+
+########################
 # 키 페어
 ########################
 
@@ -153,45 +171,66 @@ resource "local_file" "my_private_key_file" {
   file_permission = "400"
 }
 
+# PXE 네트워크 정보 출력
+output "pxe_subnet_info" {
+  description = "PXE 서브넷 정보"
+  value = {
+    subnet_id = openstack_networking_subnet_v2.pxe_subnet.id
+    cidr      = openstack_networking_subnet_v2.pxe_subnet.cidr
+    gateway   = openstack_networking_subnet_v2.pxe_subnet.gateway_ip
+  }
+}
+
+output "pxe_instance_ips" {
+  description = "각 인스턴스의 PXE 네트워크 IP 주소"
+  value = {
+    ansible_server  = var.pxe_port_ansible_server_ip
+    controller_node = var.pxe_port_controller_ip
+    compute_node1   = var.pxe_port_compute1_ip
+    compute_node2   = var.pxe_port_compute2_ip
+    storage_node    = var.pxe_port_storage_ip
+  }
+}
+
 ########################
 # Infra Port들
 ########################
 
-data "openstack_networking_network_v2" "infra_net" {
-  name = "infra-net" # 실제 네트워크 이름으로 변경
+data "openstack_networking_network_v2" "net-infra" {
+  name = "net-infra" # 실제 네트워크 이름으로 변경
 }
 
 resource "openstack_networking_port_v2" "infra_port_controller" {
   name               = "infra-port-controller"
-  network_id         = data.openstack_networking_network_v2.infra_net.id
+  network_id         = data.openstack_networking_network_v2.net-infra.id
   admin_state_up     = true
   security_group_ids = [openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id]
 }
 
 resource "openstack_networking_port_v2" "infra_port_compute1" {
   name               = "infra-port-compute1"
-  network_id         = data.openstack_networking_network_v2.infra_net.id
+  network_id         = data.openstack_networking_network_v2.net-infra.id
   admin_state_up     = true
   security_group_ids = [openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id]
 }
 
 resource "openstack_networking_port_v2" "infra_port_compute2" {
   name               = "infra-port-compute2"
-  network_id         = data.openstack_networking_network_v2.infra_net.id
+  network_id         = data.openstack_networking_network_v2.net-infra.id
   admin_state_up     = true
   security_group_ids = [openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id]
 }
 
 resource "openstack_networking_port_v2" "infra_port_storage" {
   name               = "infra-port-storage"
-  network_id         = data.openstack_networking_network_v2.infra_net.id
+  network_id         = data.openstack_networking_network_v2.net-infra.id
   admin_state_up     = true
   security_group_ids = [openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id]
 }
 
 resource "openstack_networking_port_v2" "infra_port_ansible_server" {
   name               = "infra-port-ansible_server"
-  network_id         = data.openstack_networking_network_v2.infra_net.id
+  network_id         = data.openstack_networking_network_v2.net-infra.id
   admin_state_up     = true
   security_group_ids = [openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id]
 }
@@ -297,6 +336,70 @@ resource "openstack_networking_port_v2" "k8s_internal_port_5" {
 }
 
 ########################
+# PXE 네트워크 포트들
+########################
+
+resource "openstack_networking_port_v2" "pxe_port_ansible_server" {
+  name       = "pxe-port-ansible-server"
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  security_group_ids = [
+    openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id
+  ]
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.pxe_subnet.id
+    ip_address = var.pxe_port_ansible_server_ip
+  }
+}
+
+resource "openstack_networking_port_v2" "pxe_port_controller" {
+  name       = "pxe-port-controller"
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  security_group_ids = [
+    openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id
+  ]
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.pxe_subnet.id
+    ip_address = var.pxe_port_controller_ip
+  }
+}
+
+resource "openstack_networking_port_v2" "pxe_port_compute1" {
+  name       = "pxe-port-compute1"
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  security_group_ids = [
+    openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id
+  ]
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.pxe_subnet.id
+    ip_address = var.pxe_port_compute1_ip
+  }
+}
+
+resource "openstack_networking_port_v2" "pxe_port_compute2" {
+  name       = "pxe-port-compute2"
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  security_group_ids = [
+    openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id
+  ]
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.pxe_subnet.id
+    ip_address = var.pxe_port_compute2_ip
+  }
+}
+
+resource "openstack_networking_port_v2" "pxe_port_storage" {
+  name       = "pxe-port-storage"
+  network_id = data.openstack_networking_network_v2.net-pxe.id
+  security_group_ids = [
+    openstack_networking_secgroup_v2.allow_icmp_tcp_udp_sg.id
+  ]
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.pxe_subnet.id
+    ip_address = var.pxe_port_storage_ip
+  }
+}
+
+########################
 # 1) Ansible Server
 ########################
 resource "openstack_compute_instance_v2" "ansible_server" {
@@ -315,6 +418,10 @@ resource "openstack_compute_instance_v2" "ansible_server" {
 
   network {
     port = openstack_networking_port_v2.k8s_external_port_1.id
+  }
+
+  network {
+    port = openstack_networking_port_v2.pxe_port_ansible_server.id
   }
 
   user_data = templatefile(
@@ -340,6 +447,10 @@ resource "openstack_compute_instance_v2" "controller_node" {
 
   network {
     port = openstack_networking_port_v2.k8s_internal_port_2.id
+  }
+
+  network {
+    port = openstack_networking_port_v2.pxe_port_controller.id
   }
 
   user_data = templatefile(var.cloud_init_template, {
@@ -370,6 +481,10 @@ resource "openstack_compute_instance_v2" "compute_node1" {
     port = openstack_networking_port_v2.k8s_external_port_2.id
   }
 
+  network {
+    port = openstack_networking_port_v2.pxe_port_compute1.id
+  }
+
   user_data = templatefile(var.cloud_init_template, {
     public_key = openstack_compute_keypair_v2.auto_gen_key.public_key
   })
@@ -398,6 +513,10 @@ resource "openstack_compute_instance_v2" "compute_node2" {
     port = openstack_networking_port_v2.k8s_external_port_3.id
   }
 
+  network {
+    port = openstack_networking_port_v2.pxe_port_compute2.id
+  }
+
   user_data = templatefile(var.cloud_init_template, {
     public_key = openstack_compute_keypair_v2.auto_gen_key.public_key
   })
@@ -420,6 +539,10 @@ resource "openstack_compute_instance_v2" "storage_node" {
 
   network {
     port = openstack_networking_port_v2.k8s_internal_port_5.id
+  }
+
+  network {
+    port = openstack_networking_port_v2.pxe_port_storage.id
   }
 
   user_data = templatefile(var.cloud_init_template, {
